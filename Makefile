@@ -22,7 +22,7 @@ all: xv6.img fs.img
 # http://gcc.gnu.org/onlinedocs/gcc-4.4.6/gcc/Invoking-GCC.html
 CC = gcc
 # enable extra warnings
-CFLAGS += -Wall
+CFLAGS += -Wall -Wno-deprecated-declarations
 # treat warnings as errors
 CFLAGS += -Werror
 # produce debugging information for use by gdb

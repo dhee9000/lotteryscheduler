@@ -5,6 +5,8 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "random.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
@@ -45,6 +47,12 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  /* The following code is added/modified by Amin AAM171630
+  ** Sets the initial tickets
+  */
+  p->tickets = 1;
+  p->ticks=0;
+  /* End of code added/modified */
   release(&ptable.lock);
 
   // Allocate kernel stack if possible.
@@ -141,6 +149,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->tickets = proc->tickets;
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
@@ -245,6 +254,11 @@ wait(void)
   }
 }
 
+int settickets(int n){
+  proc->tickets = n;
+  return n > 0 ? 0 : -1;
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -262,27 +276,64 @@ scheduler(void)
     sti();
 
     // Loop over process table looking for process to run.
+    /* The following code is added/modified by Amin AAM171630
+    ** Calculate the total number of tickets, select winning ticket, switch to winner
+    */
     acquire(&ptable.lock);
+    int total_tickets = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
+      total_tickets += p->tickets;
+    }
+    int winningTicket =  random_at_most(total_tickets);
+    int ticketsChecked = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      ticketsChecked += p->tickets;
+      if(ticketsChecked<winningTicket)
+        continue;
+      
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      p->ticks++;
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       proc = 0;
+      break;
     }
     release(&ptable.lock);
+    /* End of code added/modified */
 
   }
+}
+
+void getpinfo(struct pstat* pst) 
+{
+  int i = 0;
+  acquire(&ptable.lock);
+  // Update pstat table information
+  for(i = 0; i < NPROC; ++i) {
+    struct proc p = ptable.proc[i];
+    if(p.state == UNUSED) {
+      pst->inuse[i] = 0;
+    }
+    else {
+      pst->inuse[i] = 1;
+    }
+      pst->tickets[i] = p.tickets;
+      pst->pid[i] = p.pid;
+      pst->ticks[i] = p.ticks;
+  }
+  release(&ptable.lock);
 }
 
 // Enter scheduler.  Must hold only ptable.lock

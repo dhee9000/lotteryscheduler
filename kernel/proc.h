@@ -74,6 +74,12 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  /* The following code is added/modified by Amin AAM171630
+  ** Add a field for number of a tickets on a process
+  */
+  int tickets;                 // Tickets for Lottery Scheduler
+  int ticks;                   // Number of ticks this process has received
+  /* End of code added/modified */
 };
 
 // Process memory is laid out contiguously, low addresses first:

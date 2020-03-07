@@ -6,6 +6,8 @@
 #include "x86.h"
 #include "syscall.h"
 #include "sysfunc.h"
+#include "pstat.h"
+#include "proc.h"
 
 // User code makes a system call with INT T_SYSCALL.
 // System call number in %eax.
@@ -77,6 +79,32 @@ argstr(int n, char **pp)
   return fetchstr(proc, addr, pp);
 }
 
+/* The following code is added/modified by Amin AAM171630
+  ** Function to set the number of tickets on a process  
+  ** Function to get process info (tickets)
+  */
+int
+sys_settickets(void)
+{
+  int n;
+  if(argint(0, &n) < 0)
+    return -1;
+  settickets(n);
+  return 0;
+}
+
+int 
+sys_getpinfo(void){
+  struct pstat* pst;
+  argptr(0, (void*)&pst, sizeof(struct pstat*));
+  if (pst == NULL) 
+    return -1;
+  getpinfo(pst);
+  return 0;
+}
+
+/* End of code added/modified */
+
 // syscall function declarations moved to sysfunc.h so compiler
 // can catch definitions that don't match
 
@@ -103,6 +131,12 @@ static int (*syscalls[])(void) = {
 [SYS_wait]    sys_wait,
 [SYS_write]   sys_write,
 [SYS_uptime]  sys_uptime,
+/* The following code is added/modified by Amin AAM171630
+  ** Function to set the number of tickets on a process  
+  */
+[SYS_settickets] sys_settickets,
+[SYS_getpinfo] sys_getpinfo,
+/* End of code added/modified */
 };
 
 // Called on a syscall trap. Checks that the syscall number (passed via eax)
